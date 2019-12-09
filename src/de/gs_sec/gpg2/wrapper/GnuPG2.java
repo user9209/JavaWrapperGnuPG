@@ -18,8 +18,6 @@ package de.gs_sec.gpg2.wrapper;
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-import il.co.macnews.www.mageworks.java.gnupg.GnuPG;
-
 import java.io.*;
 
 /**
@@ -41,7 +39,7 @@ import java.io.*;
  * @author	Based on a class GnuPG by John Anderson, which can be found
  * @author	at: http://lists.gnupg.org/pipermail/gnupg-devel/2002-February/018098.html
  * @version	0.5
- * @see        GnuPG - http://www.gnupg.org/
+ * @see     <a href="http://www.gnupg.org/">GnuPG</a>
  */
 
 public class GnuPG2 {
@@ -69,6 +67,7 @@ public class GnuPG2 {
 
     /**
      * Do not use, allays throwing an GnuPGException
+     * @see GnuPG2#GnuPG2(String, String)
      * @param homeDir path to gpg config home
      */
     @Deprecated
@@ -82,7 +81,14 @@ public class GnuPG2 {
     }
 
     public String listKeys() throws GnuPGException {
-        return runGnuPG(fullCommand(listKeys), null);
+        return runGnuPG(fullCommand(listKeys), null).replaceFirst(".+\r?\n.+\r?\n","");
+    }
+
+    public String[] getKeyList() throws GnuPGException {
+        String result = runGnuPG(fullCommand( listKeys) , null).replaceAll("\r\n","\n");
+        result = result.replaceFirst(".+\n.+\n","");
+
+        return result.split(" *\n\n *");
     }
 
     public String getCliInteractiveCommand() {
