@@ -19,6 +19,9 @@ package de.gs_sec.gpg2.wrapper;
 */
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 /**
  * A class that implements PGP interface for Java.
@@ -47,18 +50,36 @@ public class GnuPG2 {
     private String homeDir = null;
     private String binGPG = null;
 
+    public static final String[] winPaths = new String[] {
+            "C:\\Program Files (x86)\\GnuPG\\bin\\gpg.exe",
+            "C:\\Program Files\\GnuPG\\bin\\gpg.exe",
+    };
+
+    public static final String[] linuxPaths = new String[] {
+        "gpg2",
+        "/usr/bin/gpg2",
+        "gpg",
+        "/usr/bin/gpg",
+    };
+
+
     public static final String batchCommand = "--yes --batch";
     public static final String cli = "%1 %2 %3 %4 %5 %6";
     public static final String listKeys = "--list-keys";
 
     public static final String importKey = "--import";
     public static final String fingerprint = "--import-options show-only --fingerprint --import";
-    public static final String enc = "-a --output - --encrypt -r";
-    public static final String dec = "-a --output - --decrypt";
+    public static final String enc = "-a --output - --encrypt -r"; // --throw-keyids
+    public static final String encSign = "-a --output - --encrypt --sign -r"; // --throw-keyids
+    public static final String dec = "-a --output - --decrypt"; // --try-all-secrets
+
+    // todo: Does not ensure that a signature exists!
+    public static final String decVerify = "-a --output - --decrypt"; // --try-all-secrets
 
     /**
      * @param binGPG  gpg binary
      * @param homeDir if null default is used
+     * @see GnuPG2#GnuPG2(String)
      */
     public GnuPG2(String binGPG, String homeDir) {
         this.binGPG = binGPG;
@@ -66,14 +87,32 @@ public class GnuPG2 {
     }
 
     /**
-     * Do not use, allays throwing an GnuPGException
-     * @see GnuPG2#GnuPG2(String, String)
+     *
      * @param homeDir path to gpg config home
      */
-    @Deprecated
     public GnuPG2(String homeDir) {
         this.homeDir = homeDir;
-        // todo: implement autoDetection
+        this.binGPG = findGPG();
+    }
+
+    public static String findGPG() {
+        if (OS.isWindows())
+        {
+            for (String path:  winPaths) {
+                if (Files.exists(Paths.get(path)))
+                    return "\"" + path + "\"";
+            }
+        }
+
+        if (OS.isLinux())
+        {
+            for (String path:  linuxPaths) {
+                if (Files.exists(Paths.get(path)))
+                    return path.replaceAll(" ","\\ ");
+            }
+        }
+
+        return null;
     }
 
     public String importKeyFile(String file) throws GnuPGException {
@@ -120,6 +159,21 @@ public class GnuPG2 {
         return runGnuPG(fullCommand(dec), data);
     }
 
+    public String encryptAndSign(String data, String receiver) throws GnuPGException {
+        return runGnuPG(fullCommand(encSign, receiver), data);
+
+    }
+
+    /**
+     * Does not ensure that a signature exists!
+     * @param data
+     * @return
+     * @throws GnuPGException
+     */
+    public String decryptAndVerify(String data) throws GnuPGException {
+        return runGnuPG(fullCommand(decVerify), data);
+    }
+
     public String fullCommand(String command) {
         return binGPG + " " + batchCommand + " " + homeDir + " " + command;
     }
@@ -149,8 +203,30 @@ public class GnuPG2 {
             throw new GnuPGException("io Error " + io.getMessage());
         }
 
-        GnuPG2.ProcessStreamReader psr_stdout = new GnuPG2.ProcessStreamReader(p.getInputStream());
-        GnuPG2.ProcessStreamReader psr_stderr = new GnuPG2.ProcessStreamReader(p.getErrorStream());
+        GnuPG2.ProcessStreamReader psr_stdout;
+        GnuPG2.ProcessStreamReader psr_stderr;
+        if(OS.isWindows())
+        {
+            try {
+                psr_stdout = new ProcessStreamReader(p.getInputStream(), "CP437");
+
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+                psr_stdout = new GnuPG2.ProcessStreamReader(p.getInputStream());
+            }
+            try {
+                psr_stderr = new ProcessStreamReader(p.getErrorStream(), "CP437");
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+                psr_stderr = new GnuPG2.ProcessStreamReader(p.getErrorStream());
+            }
+
+        }
+        else {
+            psr_stdout = new GnuPG2.ProcessStreamReader(p.getInputStream());
+            psr_stderr = new GnuPG2.ProcessStreamReader(p.getErrorStream());
+        }
+
         psr_stdout.start();
         psr_stderr.start();
         if (stdIn != null) {
@@ -207,8 +283,21 @@ public class GnuPG2 {
         ProcessStreamReader(InputStream in) {
             super();
 
-            this.in = new InputStreamReader(in);
+            this.in = new InputStreamReader(in, StandardCharsets.UTF_8);
+            this.stream = new StringBuffer();
+        }
 
+        ProcessStreamReader(InputStream in, String encoding) throws UnsupportedEncodingException {
+            super();
+
+            this.in = new InputStreamReader(in, encoding);
+            this.stream = new StringBuffer();
+        }
+
+        ProcessStreamReader(InputStreamReader in) {
+            super();
+
+            this.in = in;
             this.stream = new StringBuffer();
         }
 
