@@ -52,3 +52,11 @@ does not work at all. Autodetection should be implemented.
 ### On Windows sdtout of GnuPG may have encoding errors
 
 Windows is not using UTF-8.
+
+
+
+## Related work
+
+[Yaniv Yemini @2004](http://www.macnews.co.il/mageworks/java/gnupg/)
+
+[John Anderson @2002](https://lists.gnupg.org/pipermail/gnupg-devel/2002-February/018098.html)
